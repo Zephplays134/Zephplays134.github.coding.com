@@ -193,6 +193,7 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [theme, setTheme] = useState<Theme>('dark')
   const [editorAction, setEditorAction] = useState<EditorAction>(null)
+  const [selectionText, setSelectionText] = useState<string>('')
   const { addToast } = useToasts()
   
   const {
@@ -231,7 +232,7 @@ const App: React.FC = () => {
     if (savedFile) {
       addToast(`Saved ${savedFile.name}`, 'success');
     }
-  }, [files, addToast])
+  }, [files, addToast, setFiles])
 
   const handleCompile = useCallback(() => {
     if (activeFile) {
@@ -428,6 +429,7 @@ const App: React.FC = () => {
                   onEditorActionComplete={() => setEditorAction(null)}
                   theme={theme}
                   onOpenSettings={() => setIsSettingsOpen(true)}
+                  onSelectionChange={setSelectionText}
                 />
                 <AnimatePresence>
                   {isCompilationPanelOpen && (
@@ -464,6 +466,7 @@ const App: React.FC = () => {
               activeFile={activeFile}
               onInsertCode={handleInsertCode}
               onReplaceCode={handleReplaceCode}
+              selectionText={selectionText}
             />
           )}
         </AnimatePresence>

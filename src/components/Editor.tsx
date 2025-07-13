@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { FileItem, EditorAction, Theme } from '../types'
 import { getLanguageFromFilename } from '../utils/fileUtils'
+import { useCodeCompletion } from '../hooks/useCodeCompletion'
 
 interface EditorProps {
   files: FileItem[]
@@ -36,6 +37,7 @@ interface EditorProps {
   onEditorActionComplete: () => void
   theme: Theme
   onOpenSettings: () => void
+  onSelectionChange: (selection: string) => void
 }
 
 const Editor: React.FC<EditorProps> = ({
@@ -57,11 +59,13 @@ const Editor: React.FC<EditorProps> = ({
   editorAction,
   onEditorActionComplete,
   theme,
-  onOpenSettings
+  onOpenSettings,
+  onSelectionChange
 }) => {
   const editorRef = useRef<any>(null)
   const monacoRef = useRef<any>(null)
   const openFiles = files.filter(file => file.isOpen)
+  const { getCompletion } = useCodeCompletion()
 
   useEffect(() => {
     if (editorAction && editorRef.current && monacoRef.current) {
@@ -104,6 +108,11 @@ const Editor: React.FC<EditorProps> = ({
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor
     monacoRef.current = monaco
+
+    editor.onDidChangeCursorSelection(() => {
+      const selection = editor.getModel()?.getValueInRange(editor.getSelection())
+      onSelectionChange(selection || '')
+    })
     
     monaco.editor.defineTheme('void-dark', {
       base: 'vs-dark', inherit: true,
@@ -118,6 +127,29 @@ const Editor: React.FC<EditorProps> = ({
     })
     
     monaco.editor.setTheme(theme === 'dark' ? 'void-dark' : 'void-light')
+
+    // Register Inline Completion Provider for AI suggestions
+    monaco.languages.registerInlineCompletionsProvider({ pattern: '**' }, {
+      provideInlineCompletions: async (model: any, position: any) => {
+        if (!isAIActive) return;
+        const suggestion = getCompletion(model, position);
+        if (!suggestion) return;
+        
+        return {
+          items: [{
+            insertText: suggestion,
+            // Make the suggestion appear as ghost text
+            range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column + suggestion.length),
+          }]
+        };
+      },
+      freeInlineCompletions: () => {}
+    });
+
+    // Command to accept the completion
+    editor.addCommand(monaco.KeyCode.Tab, () => {
+      editor.trigger('keyboard', 'acceptAndFixTabStops', {});
+    }, '!suggestWidgetVisible');
   }
 
   return (
@@ -195,6 +227,7 @@ const Editor: React.FC<EditorProps> = ({
               scrollBeyondLastLine: false,
               wordWrap: 'on',
               automaticLayout: true,
+              inlineSuggest: { enabled: true } // Enable inline suggestions
             }}
           />
         ) : (

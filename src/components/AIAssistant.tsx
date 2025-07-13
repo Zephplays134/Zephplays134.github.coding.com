@@ -11,7 +11,10 @@ import {
   DownloadCloudIcon,
   ReplaceIcon,
   SquareIcon,
-  Trash2Icon
+  Trash2Icon,
+  SparklesIcon,
+  BugIcon,
+  FileTextIcon
 } from 'lucide-react'
 import { FileItem } from '../types'
 import { useToasts } from '../hooks/useToasts'
@@ -22,6 +25,7 @@ interface AIAssistantProps {
   activeFile: FileItem | undefined
   onInsertCode: (code: string) => void
   onReplaceCode: (code: string) => void
+  selectionText: string
   className?: string
 }
 
@@ -69,6 +73,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
   activeFile,
   onInsertCode,
   onReplaceCode,
+  selectionText,
   className = ''
 }) => {
   const [messages, setMessages] = useState<Message[]>([])
@@ -85,18 +90,24 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
   }
 
   useEffect(() => {
-    if (messages.length === 0) {
+    if (messages.length === 0 || (selectionText && messages.length === 1)) {
+      const initialMessage = selectionText
+        ? `I see you've selected some code in \`${activeFile?.name}\`. How can I help you with it?`
+        : "Hello! I'm your AI coding assistant. How can I help you today?"
+
       setMessages([
         {
           id: '1',
           type: 'ai',
-          content: 'Hello! I\'m your AI coding assistant. I can help you write code, explain concepts, debug issues, and provide suggestions. What would you like to work on?',
+          content: initialMessage,
           timestamp: new Date(),
-          suggestions: ["Explain the active file", "Create a React component", "Generate a login form"]
+          suggestions: selectionText 
+            ? ["Explain this selection", "Refactor this code", "Find bugs"]
+            : ["Explain the active file", "Create a React component", "Generate a login form"]
         }
       ]);
     }
-  }, [messages.length]);
+  }, [selectionText, activeFile?.name, messages.length]);
 
   useEffect(scrollToBottom, [messages]);
 
@@ -109,7 +120,24 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
   const mockAIResponse = useCallback((userInput: string, signal: AbortSignal): Omit<Message, 'id' | 'type' | 'timestamp'> => {
     const lowerInput = userInput.toLowerCase();
     
-    if (lowerInput.includes('explain') && (lowerInput.includes('file') || lowerInput.includes('code'))) {
+    if (lowerInput.includes('refactor')) {
+        return {
+            content: "Of course. I've refactored the selected code for better readability and performance. I've converted it to an async function and used a more modern `for...of` loop.",
+            codeBlock: `async function fetchData(url) {\n  try {\n    const response = await fetch(url);\n    if (!response.ok) {\n      throw new Error(\`HTTP error! status: \${response.status}\`);\n    }\n    const data = await response.json();\n    console.log('Data fetched successfully');\n    return data;\n  } catch (error) {\n    console.error('Error fetching data:', error);\n    return null;\n  }\n}`
+        }
+    }
+
+    if (lowerInput.includes('bug')) {
+        return {
+            content: "I've analyzed the selection and found a potential issue. The `count` variable is not properly handled in the case of a failed API call, which could lead to inconsistent state. Here's a corrected version:",
+            codeBlock: `button.addEventListener('click', async () => {\n  try {\n    // Assuming an API call that might fail\n    const success = await api.updateCount();\n    if (success) {\n      count++;\n      button.textContent = \`Clicked \${count} times\`;\n    }\n  } catch (e) {\n    console.error("Failed to update count:", e);\n  }\n});`
+        }
+    }
+
+    if (lowerInput.includes('explain')) {
+      if (selectionText) {
+        return { content: `This code snippet appears to be a JavaScript event listener attached to a button. When the button is clicked, it increments a 'count' variable and updates the button's text to display the new count. It also logs a message to the console when the script first loads.` };
+      }
       if (activeFile) {
         return {
           content: `Certainly! The active file is \`${activeFile.name}\`, which is a ${activeFile.language} file. Here's a brief overview:\n\nThis file appears to define a simple interactive element. It likely sets up some basic structure (HTML), styling (CSS), and user interaction logic (JavaScript). I can provide a more detailed breakdown if you'd like.`,
@@ -150,7 +178,7 @@ export default Counter;`
 • **Debugging**: Find and fix issues.`,
       suggestions: ["Explain this code", "Suggest optimizations", "Help me debug this"]
     }
-  }, [activeFile]);
+  }, [activeFile, selectionText]);
 
   const handleSendMessage = useCallback(async (messageContent: string) => {
     if (!messageContent.trim() || isLoading) return
@@ -216,6 +244,16 @@ export default Counter;`
   }
 
   if (!isOpen) return null
+
+  const QuickActionButton: React.FC<{ icon: React.ElementType, label: string, action: string }> = ({ icon: Icon, label, action }) => (
+    <button
+      onClick={() => handleSendMessage(action)}
+      className="flex-1 flex flex-col items-center justify-center p-2 space-y-1 bg-void-100 dark:bg-void-800 rounded-lg hover:bg-blue-500/10 dark:hover:bg-blue-500/20 text-void-700 dark:text-void-300 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+    >
+      <Icon className="w-5 h-5" />
+      <span className="text-xs">{label}</span>
+    </button>
+  );
 
   return (
     <motion.div
@@ -298,6 +336,16 @@ export default Counter;`
             <div ref={messagesEndRef} />
           </div>
           <div className="p-3 border-t border-void-200 dark:border-void-700">
+            {selectionText && (
+              <div className="mb-3 p-2 bg-void-100 dark:bg-void-800 rounded-lg">
+                <p className="text-xs text-void-600 dark:text-void-400 mb-2">Quick actions for selection:</p>
+                <div className="flex items-center space-x-2">
+                  <QuickActionButton icon={FileTextIcon} label="Explain" action="Explain this selection" />
+                  <QuickActionButton icon={SparklesIcon} label="Refactor" action="Refactor this code" />
+                  <QuickActionButton icon={BugIcon} label="Find Bugs" action="Find bugs in this code" />
+                </div>
+              </div>
+            )}
             {isLoading && (
               <button
                 onClick={stopGeneration}
