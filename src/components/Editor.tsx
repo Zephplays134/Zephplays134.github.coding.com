@@ -7,9 +7,14 @@ import {
   MenuIcon, 
   SaveIcon, 
   SettingsIcon,
-  PlayIcon
+  PlayIcon,
+  BotIcon,
+  CommandIcon,
+  EyeIcon,
+  EyeOffIcon
 } from 'lucide-react'
-import { FileItem } from '../types'
+import { FileItem, EditorAction } from '../types'
+import { getLanguageFromFilename } from '../utils/fileUtils'
 
 interface EditorProps {
   files: FileItem[]
@@ -17,8 +22,18 @@ interface EditorProps {
   onFileClose: (fileId: string) => void
   onFileContentChange: (fileId: string, content: string) => void
   onFileSelect: (fileId: string) => void
+  onFileSave: (fileId: string) => void
   sidebarCollapsed: boolean
   onToggleSidebar: () => void
+  isAIActive?: boolean
+  onToggleAI?: () => void
+  onOpenAIAssistant?: () => void
+  onOpenCommandPalette?: () => void
+  isPreviewOpen: boolean
+  onTogglePreview: () => void
+  onCompile: () => void
+  editorAction: EditorAction
+  onEditorActionComplete: () => void
 }
 
 const Editor: React.FC<EditorProps> = ({
@@ -27,11 +42,48 @@ const Editor: React.FC<EditorProps> = ({
   onFileClose,
   onFileContentChange,
   onFileSelect,
+  onFileSave,
   sidebarCollapsed,
-  onToggleSidebar
+  onToggleSidebar,
+  isAIActive = false,
+  onToggleAI,
+  onOpenAIAssistant,
+  onOpenCommandPalette,
+  isPreviewOpen,
+  onTogglePreview,
+  onCompile,
+  editorAction,
+  onEditorActionComplete
 }) => {
   const editorRef = useRef<any>(null)
+  const monacoRef = useRef<any>(null)
   const openFiles = files.filter(file => file.isOpen)
+
+  useEffect(() => {
+    if (editorAction && editorRef.current && monacoRef.current) {
+      const editor = editorRef.current
+      const monaco = monacoRef.current
+      
+      if (editorAction.type === 'insert') {
+        const position = editor.getPosition()
+        editor.executeEdits('ai-assistant', [{
+          range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column),
+          text: editorAction.code
+        }])
+      } else if (editorAction.type === 'replace') {
+        const selection = editor.getSelection()
+        if (selection) {
+          editor.executeEdits('ai-assistant', [{
+            range: selection,
+            text: editorAction.code
+          }])
+        }
+      }
+      
+      onEditorActionComplete()
+      editor.focus()
+    }
+  }, [editorAction, onEditorActionComplete])
 
   const handleEditorChange = (value: string | undefined) => {
     if (activeFile && value !== undefined) {
@@ -39,11 +91,11 @@ const Editor: React.FC<EditorProps> = ({
     }
   }
 
-  const handleEditorDidMount = (editor: any) => {
+  const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor
+    monacoRef.current = monaco
     
-    // Configure Monaco Editor theme
-    editor.defineTheme('void-dark', {
+    monaco.editor.defineTheme('void-dark', {
       base: 'vs-dark',
       inherit: true,
       rules: [
@@ -52,6 +104,15 @@ const Editor: React.FC<EditorProps> = ({
         { token: 'string', foreground: '10b981' },
         { token: 'number', foreground: 'f59e0b' },
         { token: 'function', foreground: '8b5cf6' },
+        { token: 'variable', foreground: 'f8fafc' },
+        { token: 'type', foreground: '06b6d4' },
+        { token: 'class', foreground: 'f472b6' },
+        { token: 'interface', foreground: 'a78bfa' },
+        { token: 'namespace', foreground: 'fbbf24' },
+        { token: 'parameter', foreground: 'fcd34d' },
+        { token: 'property', foreground: '34d399' },
+        { token: 'enum', foreground: 'fb7185' },
+        { token: 'operator', foreground: '94a3b8' },
       ],
       colors: {
         'editor.background': '#020617',
@@ -63,45 +124,55 @@ const Editor: React.FC<EditorProps> = ({
         'editorWhitespace.foreground': '#475569',
         'editorIndentGuide.background': '#334155',
         'editorIndentGuide.activeBackground': '#475569',
+        'editorLineNumber.foreground': '#64748b',
+        'editorLineNumber.activeForeground': '#94a3b8',
+        'editor.selectionHighlightBackground': '#334155',
+        'editor.wordHighlightBackground': '#1e293b',
+        'editor.wordHighlightStrongBackground': '#334155',
+        'editor.findMatchBackground': '#fbbf24',
+        'editor.findMatchHighlightBackground': '#f59e0b',
+        'editor.hoverHighlightBackground': '#334155',
+        'editorSuggestWidget.background': '#1e293b',
+        'editorSuggestWidget.border': '#475569',
+        'editorSuggestWidget.foreground': '#f8fafc',
+        'editorSuggestWidget.selectedBackground': '#334155',
+        'editorWidget.background': '#1e293b',
+        'editorWidget.border': '#475569',
+        'input.background': '#0f172a',
+        'input.border': '#475569',
+        'input.foreground': '#f8fafc',
+        'inputOption.activeBorder': '#3b82f6',
+        'dropdown.background': '#1e293b',
+        'dropdown.border': '#475569',
+        'dropdown.foreground': '#f8fafc',
+        'list.activeSelectionBackground': '#334155',
+        'list.activeSelectionForeground': '#f8fafc',
+        'list.hoverBackground': '#1e293b',
+        'list.inactiveSelectionBackground': '#1e293b',
+        'list.inactiveSelectionForeground': '#f8fafc',
+        'menu.background': '#1e293b',
+        'menu.border': '#475569',
+        'menu.foreground': '#f8fafc',
+        'menu.selectionBackground': '#334155',
+        'menu.selectionForeground': '#f8fafc',
+        'menubar.selectionBackground': '#334155',
+        'menubar.selectionForeground': '#f8fafc',
+        'peekView.border': '#475569',
+        'peekViewEditor.background': '#0f172a',
+        'peekViewResult.background': '#1e293b',
+        'peekViewTitle.background': '#334155',
+        'scrollbar.shadow': '#020617',
+        'scrollbarSlider.background': '#475569',
+        'scrollbarSlider.hoverBackground': '#64748b',
+        'scrollbarSlider.activeBackground': '#94a3b8',
       }
     })
     
-    editor.setTheme('void-dark')
-  }
-
-  const getLanguageFromFilename = (filename: string): string => {
-    const extension = filename.split('.').pop()?.toLowerCase()
-    const languageMap: { [key: string]: string } = {
-      'js': 'javascript',
-      'jsx': 'javascript',
-      'ts': 'typescript',
-      'tsx': 'typescript',
-      'py': 'python',
-      'java': 'java',
-      'cpp': 'cpp',
-      'c': 'c',
-      'cs': 'csharp',
-      'php': 'php',
-      'rb': 'ruby',
-      'go': 'go',
-      'rs': 'rust',
-      'html': 'html',
-      'css': 'css',
-      'scss': 'scss',
-      'json': 'json',
-      'md': 'markdown',
-      'xml': 'xml',
-      'yaml': 'yaml',
-      'yml': 'yaml',
-      'sql': 'sql',
-      'sh': 'shell',
-      'bash': 'shell',
-    }
-    return languageMap[extension || ''] || 'plaintext'
+    monaco.editor.setTheme('void-dark')
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-void-950">
       {/* Header */}
       <div className="bg-void-900 border-b border-void-700 flex items-center justify-between px-4 py-2">
         <div className="flex items-center space-x-4">
@@ -116,15 +187,51 @@ const Editor: React.FC<EditorProps> = ({
           )}
           <h1 className="text-lg font-bold text-void-100">
             <span className="text-blue-400">void</span>
+            {isAIActive && (
+              <span className="ml-2 text-xs bg-blue-600 text-white px-2 py-1 rounded">
+                AI
+              </span>
+            )}
           </h1>
         </div>
         
         <div className="flex items-center space-x-2">
-          <button className="p-2 hover:bg-void-800 rounded transition-colors">
-            <SaveIcon className="w-4 h-4 text-void-400" />
+          <button
+            onClick={onCompile}
+            className="p-2 hover:bg-void-800 rounded transition-colors"
+            title="Compile & Run (Ctrl+B)"
+          >
+            <PlayIcon className="w-4 h-4 text-green-400" />
           </button>
-          <button className="p-2 hover:bg-void-800 rounded transition-colors">
-            <PlayIcon className="w-4 h-4 text-void-400" />
+          <button
+            onClick={onTogglePreview}
+            className="p-2 hover:bg-void-800 rounded transition-colors"
+            title={isPreviewOpen ? "Hide Preview" : "Show Preview"}
+          >
+            {isPreviewOpen ? <EyeOffIcon className="w-4 h-4 text-void-400" /> : <EyeIcon className="w-4 h-4 text-void-400" />}
+          </button>
+          <button
+            onClick={onOpenCommandPalette}
+            className="p-2 hover:bg-void-800 rounded transition-colors"
+            title="Command Palette (Ctrl+K)"
+          >
+            <CommandIcon className="w-4 h-4 text-void-400" />
+          </button>
+          <button
+            onClick={onOpenAIAssistant}
+            className={`p-2 hover:bg-void-800 rounded transition-colors ${
+              isAIActive ? 'bg-blue-600 text-white' : ''
+            }`}
+            title="AI Assistant"
+          >
+            <BotIcon className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => activeFile && onFileSave(activeFile.id)}
+            className="p-2 hover:bg-void-800 rounded transition-colors"
+            title="Save File (Ctrl+S)"
+          >
+            <SaveIcon className="w-4 h-4 text-void-400" />
           </button>
           <button className="p-2 hover:bg-void-800 rounded transition-colors">
             <SettingsIcon className="w-4 h-4 text-void-400" />
@@ -175,6 +282,7 @@ const Editor: React.FC<EditorProps> = ({
         {activeFile ? (
           <MonacoEditor
             height="100%"
+            path={activeFile.path}
             defaultLanguage={getLanguageFromFilename(activeFile.name)}
             language={getLanguageFromFilename(activeFile.name)}
             value={activeFile.content}
@@ -201,6 +309,40 @@ const Editor: React.FC<EditorProps> = ({
               renderLineHighlight: 'gutter',
               selectionHighlight: false,
               occurrencesHighlight: false,
+              theme: 'void-dark',
+              mouseWheelZoom: true,
+              contextmenu: true,
+              quickSuggestions: true,
+              parameterHints: {
+                enabled: true,
+              },
+              suggestOnTriggerCharacters: true,
+              acceptSuggestionOnEnter: 'on',
+              acceptSuggestionOnCommitCharacter: true,
+              snippetSuggestions: 'top',
+              wordBasedSuggestions: true,
+              formatOnType: true,
+              formatOnPaste: true,
+              autoClosingBrackets: 'always',
+              autoClosingQuotes: 'always',
+              autoSurround: 'languageDefined',
+              folding: true,
+              showFoldingControls: 'always',
+              foldingHighlight: true,
+              foldingImportsByDefault: false,
+              unfoldOnClickAfterEndOfLine: false,
+              renderControlCharacters: false,
+              renderIndentGuides: true,
+              highlightActiveIndentGuide: true,
+              rulers: [],
+              colorDecorators: true,
+              codeLens: true,
+              lightbulb: {
+                enabled: true,
+              },
+              codeActionsOnSave: {
+                'source.fixAll': true,
+              },
             }}
           />
         ) : (
@@ -209,6 +351,7 @@ const Editor: React.FC<EditorProps> = ({
               <FileIcon className="w-16 h-16 text-void-600 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-void-300 mb-2">No file open</h3>
               <p className="text-void-500">Select a file from the sidebar to start editing</p>
+              <p className="text-void-600 text-sm mt-2">Press Ctrl+K to open AI Command Palette</p>
             </div>
           </div>
         )}

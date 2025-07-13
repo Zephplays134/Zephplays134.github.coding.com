@@ -1,47 +1,283 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import ErrorBoundary from './components/ErrorBoundary'
 import Sidebar from './components/Sidebar'
 import Editor from './components/Editor'
 import StatusBar from './components/StatusBar'
-import { FileItem } from './types'
+import AIAssistant from './components/AIAssistant'
+import AICommandPalette from './components/AICommandPalette'
+import Preview from './components/Preview'
+import ResizablePanel from './components/ResizablePanel'
+import CompilationOutput from './components/CompilationOutput'
+import { FileItem, EditorAction } from './types'
+import { useAIFeatures } from './hooks/useAIFeatures'
+import { useFileManager } from './hooks/useFileManager'
+
+const initialFiles: FileItem[] = [
+  {
+    id: '1',
+    name: 'src',
+    path: 'src',
+    content: '',
+    language: '',
+    type: 'folder',
+    isOpen: false,
+    isActive: false,
+    isModified: false,
+    children: ['2', '6', '7', '3'],
+    isExpanded: true,
+    level: 0
+  },
+  {
+    id: '2',
+    name: 'index.html',
+    path: 'src/index.html',
+    content: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Preview</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Welcome to Void Live Preview!</h1>
+  <p>Edit this HTML file or the linked CSS and JS files to see changes in real-time.</p>
+  <button id="myButton">Click Me</button>
+  <script type="module" src="script.js"></script>
+</body>
+</html>`,
+    language: 'html',
+    type: 'file',
+    isOpen: true,
+    isActive: true,
+    isModified: false,
+    parentId: '1',
+    level: 1
+  },
+  {
+    id: '6',
+    name: 'style.css',
+    path: 'src/style.css',
+    content: `body {
+  background-color: #1a202c;
+  color: #e2e8f0;
+  font-family: sans-serif;
+  text-align: center;
+  padding: 2rem;
+}
+
+h1 {
+  color: #63b3ed;
+}
+
+button {
+  background-color: #4299e1;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+button:hover {
+  background-color: #3182ce;
+}`,
+    language: 'css',
+    type: 'file',
+    isOpen: true,
+    isActive: false,
+    isModified: false,
+    parentId: '1',
+    level: 1
+  },
+  {
+    id: '7',
+    name: 'script.js',
+    path: 'src/script.js',
+    content: `const button = document.getElementById('myButton');
+let count = 0;
+
+button.addEventListener('click', () => {
+  count++;
+  button.textContent = \`Clicked \${count} times\`;
+});
+
+console.log("Script loaded successfully!");`,
+    language: 'javascript',
+    type: 'file',
+    isOpen: true,
+    isActive: false,
+    isModified: false,
+    parentId: '1',
+    level: 1
+  },
+  {
+    id: '3',
+    name: 'components',
+    path: 'src/components',
+    content: '',
+    language: '',
+    type: 'folder',
+    isOpen: false,
+    isActive: false,
+    isModified: false,
+    parentId: '1',
+    children: ['5'],
+    isExpanded: false,
+    level: 1
+  },
+  {
+    id: '4',
+    name: 'utils',
+    path: 'src/utils',
+    content: '',
+    language: '',
+    type: 'folder',
+    isOpen: false,
+    isActive: false,
+    isModified: false,
+    parentId: '1',
+    children: [],
+    isExpanded: false,
+    level: 1
+  },
+  {
+    id: '5',
+    name: 'App.tsx',
+    path: 'src/components/App.tsx',
+    content: `import React from 'react';
+
+interface Props {
+  title: string;
+}
+
+const App: React.FC<Props> = ({ title }) => {
+  console.log('Rendering App component');
+  return (
+    <div className="app">
+      <h1>{title}</h1>
+      <p>Welcome to your new React component!</p>
+    </div>
+  );
+};
+
+export default App;`,
+    language: 'typescript',
+    type: 'file',
+    isOpen: false,
+    isActive: false,
+    isModified: false,
+    parentId: '3',
+    level: 2
+  }
+]
 
 const App: React.FC = () => {
-  const [files, setFiles] = useState<FileItem[]>([
-    {
-      id: '1',
-      name: 'welcome.md',
-      path: 'welcome.md',
-      content: `# Welcome to Void
-      
-A modern, sleek code editor built with React and Monaco Editor.
+  const {
+    files,
+    setFiles,
+    createFile,
+    createFolder,
+    deleteItem,
+    renameItem,
+    toggleFolder
+  } = useFileManager(initialFiles)
 
-## Features
-- Syntax highlighting for multiple languages
-- Dark theme optimized for long coding sessions
-- File management system
-- Real-time editing
-- Responsive design
-
-Start coding by creating a new file or editing this one!`,
-      language: 'markdown',
-      isOpen: true,
-      isActive: true,
-      isModified: false
-    }
-  ])
-
-  const [activeFileId, setActiveFileId] = useState<string>('1')
+  const [activeFileId, setActiveFileId] = useState<string>('2')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [isPreviewOpen, setIsPreviewOpen] = useState(true)
+  const [isCompilationPanelOpen, setIsCompilationPanelOpen] = useState(false)
+  const [editorAction, setEditorAction] = useState<EditorAction>(null)
+  
+  const {
+    isAIAssistantOpen,
+    isCommandPaletteOpen,
+    isAIActive,
+    isAIConnected,
+    compilationResult,
+    setCompilationResult,
+    toggleAIAssistant,
+    closeAIAssistant,
+    toggleCommandPalette,
+    closeCommandPalette,
+    toggleAIActive,
+    executeAICommand,
+    compileCode
+  } = useAIFeatures()
 
   const activeFile = files.find(file => file.id === activeFileId)
 
+  const handleFileSave = (fileId: string) => {
+    setFiles(prev => prev.map(file => 
+      file.id === fileId 
+        ? { ...file, isModified: false }
+        : file
+    ))
+  }
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key) {
+          case 'k':
+            e.preventDefault()
+            toggleCommandPalette()
+            break
+          case 'b':
+            e.preventDefault()
+            handleCompile()
+            break
+          case 'e':
+            e.preventDefault()
+            executeAICommand('explain')
+            break
+          case 'o':
+            e.preventDefault()
+            executeAICommand('optimize')
+            break
+          case 'd':
+            e.preventDefault()
+            executeAICommand('debug')
+            break
+          case 'g':
+            e.preventDefault()
+            executeAICommand('generate')
+            break
+          case 'n':
+            e.preventDefault()
+            if (e.shiftKey) {
+              handleNewFolder()
+            } else {
+              handleNewFile()
+            }
+            break
+          case 's':
+            e.preventDefault()
+            if (activeFile) {
+              handleFileSave(activeFile.id)
+            }
+            break
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [toggleCommandPalette, executeAICommand, activeFile])
+
   const handleFileSelect = (fileId: string) => {
-    setActiveFileId(fileId)
-    setFiles(prev => prev.map(file => ({
-      ...file,
-      isActive: file.id === fileId,
-      isOpen: true
-    })))
+    const file = files.find(f => f.id === fileId)
+    if (file && file.type === 'file') {
+      setActiveFileId(fileId)
+      setFiles(prev => prev.map(f => ({
+        ...f,
+        isActive: f.id === fileId,
+        isOpen: f.id === fileId ? true : f.isOpen
+      })))
+    }
   }
 
   const handleFileClose = (fileId: string) => {
@@ -50,15 +286,20 @@ Start coding by creating a new file or editing this one!`,
         file.id === fileId ? { ...file, isOpen: false, isActive: false } : file
       )
       
-      // If closing the active file, find another open file to activate
       if (fileId === activeFileId) {
-        const nextActiveFile = updatedFiles.find(file => file.isOpen && file.id !== fileId)
+        const openFiles = updatedFiles.filter(f => f.isOpen && f.type === 'file')
+        const currentActiveIndex = openFiles.findIndex(f => f.id === fileId)
+        
+        let nextActiveFile = openFiles[currentActiveIndex -1] || openFiles[0]
+
         if (nextActiveFile) {
           setActiveFileId(nextActiveFile.id)
           return updatedFiles.map(file => ({
             ...file,
             isActive: file.id === nextActiveFile.id
           }))
+        } else {
+          setActiveFileId('')
         }
       }
       
@@ -74,59 +315,158 @@ Start coding by creating a new file or editing this one!`,
     ))
   }
 
-  const handleNewFile = () => {
-    const newFile: FileItem = {
-      id: Date.now().toString(),
-      name: 'untitled.js',
-      path: 'untitled.js',
-      content: '// Start coding here...\n',
-      language: 'javascript',
-      isOpen: true,
-      isActive: true,
-      isModified: false
+  const handleNewFile = (parentId?: string) => {
+    const fileName = prompt('Enter file name:')
+    if (fileName) {
+      const newFileId = createFile(fileName, parentId)
+      setActiveFileId(newFileId)
+    }
+  }
+
+  const handleNewFolder = (parentId?: string) => {
+    const folderName = prompt('Enter folder name:')
+    if (folderName) {
+      createFolder(folderName, parentId)
+    }
+  }
+
+  const handleDeleteItem = (itemId: string) => {
+    const item = files.find(f => f.id === itemId)
+    if (item && confirm(`Are you sure you want to delete "${item.name}"?`)) {
+      deleteItem(itemId)
+      if (activeFileId === itemId) {
+        setActiveFileId('')
+      }
+    }
+  }
+
+  const handleInsertCode = useCallback((code: string) => {
+    setEditorAction({ type: 'insert', code })
+  }, [])
+  
+  const handleReplaceCode = useCallback((code: string) => {
+    setEditorAction({ type: 'replace', code })
+  }, [])
+
+  const handleAICommandExecution = (command: string, args?: any) => {
+    const result = executeAICommand(command, { ...args, file: activeFile })
+    
+    if (command.startsWith('ai-') || ['explain', 'optimize', 'debug', 'refactor', 'generate', 'document'].includes(command)) {
+      if (!isAIAssistantOpen) {
+        toggleAIAssistant()
+      }
     }
     
-    setFiles(prev => [...prev.map(f => ({ ...f, isActive: false })), newFile])
-    setActiveFileId(newFile.id)
+    return result
+  }
+
+  const handleCompile = () => {
+    if (activeFile) {
+      setIsCompilationPanelOpen(true)
+      compileCode(activeFile)
+    }
   }
 
   return (
-    <div className="editor-container bg-void-950 text-void-50 flex flex-col">
-      <div className="flex flex-1 overflow-hidden">
+    <ErrorBoundary>
+      <div className="editor-container bg-void-950 text-void-50 flex flex-col h-screen">
+        <div className="flex flex-1 overflow-hidden">
+          <AnimatePresence>
+            {!sidebarCollapsed && (
+              <motion.div
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: 'auto', opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <Sidebar
+                  files={files}
+                  onFileSelect={handleFileSelect}
+                  onNewFile={handleNewFile}
+                  onNewFolder={handleNewFolder}
+                  onDeleteItem={handleDeleteItem}
+                  onRenameItem={renameItem}
+                  onToggleFolder={toggleFolder}
+                  onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          <ResizablePanel>
+            <div className="flex-1 flex flex-col min-w-0 h-full">
+              <div className="flex flex-col flex-1 min-h-0">
+                <Editor
+                  files={files}
+                  activeFile={activeFile}
+                  onFileClose={handleFileClose}
+                  onFileContentChange={handleFileContentChange}
+                  onFileSelect={handleFileSelect}
+                  onFileSave={handleFileSave}
+                  sidebarCollapsed={sidebarCollapsed}
+                  onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  isAIActive={isAIActive}
+                  onToggleAI={toggleAIActive}
+                  onOpenAIAssistant={toggleAIAssistant}
+                  onOpenCommandPalette={toggleCommandPalette}
+                  isPreviewOpen={isPreviewOpen}
+                  onTogglePreview={() => setIsPreviewOpen(!isPreviewOpen)}
+                  onCompile={handleCompile}
+                  editorAction={editorAction}
+                  onEditorActionComplete={() => setEditorAction(null)}
+                />
+                <AnimatePresence>
+                  {isCompilationPanelOpen && (
+                    <CompilationOutput
+                      result={compilationResult}
+                      onClose={() => setIsCompilationPanelOpen(false)}
+                      onClear={() => setCompilationResult(null)}
+                      onRerun={handleCompile}
+                    />
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+            {isPreviewOpen && (
+              <div className="flex-1 flex flex-col min-w-0 h-full">
+                <Preview files={files} />
+              </div>
+            )}
+          </ResizablePanel>
+        </div>
+        
+        <StatusBar 
+          activeFile={activeFile}
+          isAIActive={isAIActive}
+          isAIConnected={isAIConnected}
+          onToggleAI={toggleAIActive}
+        />
+        
         <AnimatePresence>
-          {!sidebarCollapsed && (
-            <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 'auto', opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="overflow-hidden"
-            >
-              <Sidebar
-                files={files}
-                onFileSelect={handleFileSelect}
-                onNewFile={handleNewFile}
-                onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-              />
-            </motion.div>
+          {isAIAssistantOpen && (
+            <AIAssistant
+              isOpen={isAIAssistantOpen}
+              onClose={closeAIAssistant}
+              activeFile={activeFile}
+              onInsertCode={handleInsertCode}
+              onReplaceCode={handleReplaceCode}
+            />
           )}
         </AnimatePresence>
         
-        <div className="flex-1 flex flex-col">
-          <Editor
-            files={files}
-            activeFile={activeFile}
-            onFileClose={handleFileClose}
-            onFileContentChange={handleFileContentChange}
-            onFileSelect={handleFileSelect}
-            sidebarCollapsed={sidebarCollapsed}
-            onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
-          />
-        </div>
+        <AnimatePresence>
+          {isCommandPaletteOpen && (
+            <AICommandPalette
+              isOpen={isCommandPaletteOpen}
+              onClose={closeCommandPalette}
+              activeFile={activeFile}
+              onExecuteCommand={handleAICommandExecution}
+            />
+          )}
+        </AnimatePresence>
       </div>
-      
-      <StatusBar activeFile={activeFile} />
-    </div>
+    </ErrorBoundary>
   )
 }
 

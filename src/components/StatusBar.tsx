@@ -2,12 +2,21 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import { FileIcon, GitBranchIcon, AlertCircleIcon, CheckCircleIcon } from 'lucide-react'
 import { FileItem } from '../types'
+import AIStatusIndicator from './AIStatusIndicator'
 
 interface StatusBarProps {
   activeFile: FileItem | undefined
+  isAIActive?: boolean
+  isAIConnected?: boolean
+  onToggleAI?: () => void
 }
 
-const StatusBar: React.FC<StatusBarProps> = ({ activeFile }) => {
+const StatusBar: React.FC<StatusBarProps> = ({ 
+  activeFile, 
+  isAIActive = false, 
+  isAIConnected = false,
+  onToggleAI
+}) => {
   const getLanguageDisplay = (filename: string): string => {
     const extension = filename.split('.').pop()?.toLowerCase()
     const languageMap: { [key: string]: string } = {
@@ -63,6 +72,14 @@ const StatusBar: React.FC<StatusBarProps> = ({ activeFile }) => {
           <CheckCircleIcon className="w-3 h-3 text-green-400" />
           <span className="text-void-300">No issues</span>
         </div>
+        
+        {onToggleAI && (
+          <AIStatusIndicator
+            isActive={isAIActive}
+            isConnected={isAIConnected}
+            onToggle={onToggleAI}
+          />
+        )}
       </div>
 
       <div className="flex items-center space-x-4">
@@ -86,6 +103,10 @@ const StatusBar: React.FC<StatusBarProps> = ({ activeFile }) => {
             </div>
           </>
         )}
+        
+        <div className="text-void-500 text-xs">
+          Ctrl+K for commands
+        </div>
       </div>
     </motion.div>
   )

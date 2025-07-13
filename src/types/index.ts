@@ -7,6 +7,11 @@ export interface FileItem {
   isOpen: boolean
   isActive: boolean
   isModified: boolean
+  type: 'file' | 'folder'
+  parentId?: string
+  children?: string[]
+  isExpanded?: boolean
+  level?: number
 }
 
 export interface EditorTheme {
@@ -16,4 +21,22 @@ export interface EditorTheme {
   accent: string
   background: string
   foreground: string
+}
+
+export interface FolderContextMenu {
+  x: number
+  y: number
+  itemId: string
+  type: 'file' | 'folder'
+}
+
+export type EditorAction = {
+  type: 'insert' | 'replace'
+  code: string
+} | null
+
+export interface CompilationResult {
+  status: 'running' | 'success' | 'error' | 'info';
+  output: string[];
+  timestamp: string;
 }
