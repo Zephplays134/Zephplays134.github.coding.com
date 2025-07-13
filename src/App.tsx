@@ -9,9 +9,11 @@ import AICommandPalette from './components/AICommandPalette'
 import Preview from './components/Preview'
 import ResizablePanel from './components/ResizablePanel'
 import CompilationOutput from './components/CompilationOutput'
-import { FileItem, EditorAction } from './types'
+import SettingsPanel from './components/SettingsPanel'
+import { FileItem, EditorAction, Theme } from './types'
 import { useAIFeatures } from './hooks/useAIFeatures'
 import { useFileManager } from './hooks/useFileManager'
+import { useToasts } from './hooks/useToasts'
 
 const initialFiles: FileItem[] = [
   {
@@ -60,11 +62,10 @@ const initialFiles: FileItem[] = [
     name: 'style.css',
     path: 'src/style.css',
     content: `body {
-  background-color: #1a202c;
-  color: #e2e8f0;
   font-family: sans-serif;
   text-align: center;
   padding: 2rem;
+  transition: background-color 0.3s, color 0.3s;
 }
 
 h1 {
@@ -189,7 +190,10 @@ const App: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [isPreviewOpen, setIsPreviewOpen] = useState(true)
   const [isCompilationPanelOpen, setIsCompilationPanelOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [theme, setTheme] = useState<Theme>('dark')
   const [editorAction, setEditorAction] = useState<EditorAction>(null)
+  const { addToast } = useToasts()
   
   const {
     isAIAssistantOpen,
@@ -209,64 +213,88 @@ const App: React.FC = () => {
 
   const activeFile = files.find(file => file.id === activeFileId)
 
-  const handleFileSave = (fileId: string) => {
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [theme])
+
+  const handleFileSave = useCallback((fileId: string) => {
     setFiles(prev => prev.map(file => 
       file.id === fileId 
         ? { ...file, isModified: false }
         : file
     ))
-  }
+    const savedFile = files.find(f => f.id === fileId);
+    if (savedFile) {
+      addToast(`Saved ${savedFile.name}`, 'success');
+    }
+  }, [files, addToast])
+
+  const handleCompile = useCallback(() => {
+    if (activeFile) {
+      setIsCompilationPanelOpen(true)
+      compileCode(activeFile)
+    }
+  }, [activeFile, compileCode])
+
+  const handleNewFile = useCallback((parentId?: string) => {
+    const fileName = prompt('Enter file name:')
+    if (fileName) {
+      const newFileId = createFile(fileName, parentId)
+      setActiveFileId(newFileId)
+    }
+  }, [createFile])
+
+  const handleNewFolder = useCallback((parentId?: string) => {
+    const folderName = prompt('Enter folder name:')
+    if (folderName) {
+      createFolder(folderName, parentId)
+    }
+  }, [createFolder])
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      const isEditing = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+
       if (e.ctrlKey || e.metaKey) {
+        if (e.key === 's') {
+          e.preventDefault()
+          if (activeFile) {
+            handleFileSave(activeFile.id)
+          }
+          return
+        }
+
+        if (isEditing) return
+
         switch (e.key) {
-          case 'k':
-            e.preventDefault()
-            toggleCommandPalette()
-            break
-          case 'b':
-            e.preventDefault()
-            handleCompile()
-            break
-          case 'e':
-            e.preventDefault()
-            executeAICommand('explain')
-            break
-          case 'o':
-            e.preventDefault()
-            executeAICommand('optimize')
-            break
-          case 'd':
-            e.preventDefault()
-            executeAICommand('debug')
-            break
-          case 'g':
-            e.preventDefault()
-            executeAICommand('generate')
-            break
-          case 'n':
-            e.preventDefault()
-            if (e.shiftKey) {
-              handleNewFolder()
-            } else {
-              handleNewFile()
-            }
-            break
-          case 's':
-            e.preventDefault()
-            if (activeFile) {
-              handleFileSave(activeFile.id)
-            }
-            break
+          case 'k': e.preventDefault(); toggleCommandPalette(); break
+          case 'b': e.preventDefault(); handleCompile(); break
+          case 'e': e.preventDefault(); executeAICommand('explain'); break
+          case 'o': e.preventDefault(); executeAICommand('optimize'); break
+          case 'd': e.preventDefault(); executeAICommand('debug'); break
+          case 'g': e.preventDefault(); executeAICommand('generate'); break
+          case 'n': e.preventDefault(); e.shiftKey ? handleNewFolder() : handleNewFile(); break
         }
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [toggleCommandPalette, executeAICommand, activeFile])
+  }, [
+    activeFile, 
+    toggleCommandPalette, 
+    executeAICommand, 
+    handleFileSave, 
+    handleCompile, 
+    handleNewFile, 
+    handleNewFolder
+  ])
 
   const handleFileSelect = (fileId: string) => {
     const file = files.find(f => f.id === fileId)
@@ -315,21 +343,6 @@ const App: React.FC = () => {
     ))
   }
 
-  const handleNewFile = (parentId?: string) => {
-    const fileName = prompt('Enter file name:')
-    if (fileName) {
-      const newFileId = createFile(fileName, parentId)
-      setActiveFileId(newFileId)
-    }
-  }
-
-  const handleNewFolder = (parentId?: string) => {
-    const folderName = prompt('Enter folder name:')
-    if (folderName) {
-      createFolder(folderName, parentId)
-    }
-  }
-
   const handleDeleteItem = (itemId: string) => {
     const item = files.find(f => f.id === itemId)
     if (item && confirm(`Are you sure you want to delete "${item.name}"?`)) {
@@ -349,6 +362,11 @@ const App: React.FC = () => {
   }, [])
 
   const handleAICommandExecution = (command: string, args?: any) => {
+    if (command === 'settings-open') {
+      setIsSettingsOpen(true);
+      return;
+    }
+
     const result = executeAICommand(command, { ...args, file: activeFile })
     
     if (command.startsWith('ai-') || ['explain', 'optimize', 'debug', 'refactor', 'generate', 'document'].includes(command)) {
@@ -360,16 +378,9 @@ const App: React.FC = () => {
     return result
   }
 
-  const handleCompile = () => {
-    if (activeFile) {
-      setIsCompilationPanelOpen(true)
-      compileCode(activeFile)
-    }
-  }
-
   return (
     <ErrorBoundary>
-      <div className="editor-container bg-void-950 text-void-50 flex flex-col h-screen">
+      <div className="editor-container bg-white dark:bg-void-950 text-void-900 dark:text-void-50 flex flex-col h-screen">
         <div className="flex flex-1 overflow-hidden">
           <AnimatePresence>
             {!sidebarCollapsed && (
@@ -415,6 +426,8 @@ const App: React.FC = () => {
                   onCompile={handleCompile}
                   editorAction={editorAction}
                   onEditorActionComplete={() => setEditorAction(null)}
+                  theme={theme}
+                  onOpenSettings={() => setIsSettingsOpen(true)}
                 />
                 <AnimatePresence>
                   {isCompilationPanelOpen && (
@@ -465,6 +478,13 @@ const App: React.FC = () => {
             />
           )}
         </AnimatePresence>
+
+        <SettingsPanel
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          theme={theme}
+          setTheme={setTheme}
+        />
       </div>
     </ErrorBoundary>
   )

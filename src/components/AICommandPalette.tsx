@@ -11,7 +11,8 @@ import {
   BookOpenIcon,
   BugIcon,
   XIcon,
-  PlayIcon
+  PlayIcon,
+  SettingsIcon
 } from 'lucide-react'
 import { FileItem } from '../types'
 
@@ -27,7 +28,7 @@ interface Command {
   title: string
   description: string
   icon: React.ComponentType<any>
-  category: 'ai' | 'code' | 'file' | 'debug' | 'run'
+  category: 'ai' | 'code' | 'file' | 'debug' | 'run' | 'system'
   shortcut?: string
   action: string
 }
@@ -80,15 +81,6 @@ const AICommandPalette: React.FC<AICommandPaletteProps> = ({
       action: 'debug'
     },
     {
-      id: 'ai-refactor',
-      title: 'AI: Refactor Code',
-      description: 'Suggest code improvements and refactoring',
-      icon: RefreshCwIcon,
-      category: 'ai',
-      shortcut: 'Ctrl+R',
-      action: 'refactor'
-    },
-    {
       id: 'ai-generate',
       title: 'AI: Generate Code',
       description: 'Generate code based on description',
@@ -98,24 +90,6 @@ const AICommandPalette: React.FC<AICommandPaletteProps> = ({
       action: 'generate'
     },
     {
-      id: 'ai-document',
-      title: 'AI: Add Documentation',
-      description: 'Generate comments and documentation',
-      icon: BookOpenIcon,
-      category: 'ai',
-      shortcut: 'Ctrl+Shift+D',
-      action: 'document'
-    },
-    {
-      id: 'code-format',
-      title: 'Format Code',
-      description: 'Format the current file',
-      icon: CodeIcon,
-      category: 'code',
-      shortcut: 'Ctrl+Shift+F',
-      action: 'format'
-    },
-    {
       id: 'file-save',
       title: 'Save File',
       description: 'Save the current file',
@@ -123,6 +97,14 @@ const AICommandPalette: React.FC<AICommandPaletteProps> = ({
       category: 'file',
       shortcut: 'Ctrl+S',
       action: 'save'
+    },
+    {
+      id: 'system-settings',
+      title: 'Open Settings',
+      description: 'Adjust editor and UI settings',
+      icon: SettingsIcon,
+      category: 'system',
+      action: 'settings-open'
     }
   ]
 
@@ -177,6 +159,7 @@ const AICommandPalette: React.FC<AICommandPaletteProps> = ({
       case 'file': return 'text-yellow-400'
       case 'debug': return 'text-red-400'
       case 'run': return 'text-green-400'
+      case 'system': return 'text-purple-400'
       default: return 'text-void-400'
     }
   }
@@ -198,7 +181,6 @@ const AICommandPalette: React.FC<AICommandPaletteProps> = ({
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-2xl bg-void-900 border border-void-700 rounded-lg shadow-2xl overflow-hidden"
       >
-        {/* Header */}
         <div className="p-4 border-b border-void-700 bg-void-800">
           <div className="flex items-center space-x-3">
             <SearchIcon className="w-5 h-5 text-void-400" />
@@ -211,21 +193,14 @@ const AICommandPalette: React.FC<AICommandPaletteProps> = ({
               placeholder="Search commands..."
               className="flex-1 bg-transparent text-void-100 placeholder-void-400 focus:outline-none"
             />
-            <button
-              onClick={onClose}
-              className="p-1 hover:bg-void-700 rounded transition-colors"
-            >
+            <button onClick={onClose} className="p-1 hover:bg-void-700 rounded transition-colors">
               <XIcon className="w-4 h-4 text-void-400" />
             </button>
           </div>
         </div>
-
-        {/* Commands */}
         <div className="max-h-96 overflow-y-auto scrollbar-thin">
           {filteredCommands.length === 0 ? (
-            <div className="p-4 text-center text-void-400">
-              No commands found
-            </div>
+            <div className="p-4 text-center text-void-400">No commands found</div>
           ) : (
             <div className="p-2">
               {filteredCommands.map((command, index) => (
@@ -234,41 +209,24 @@ const AICommandPalette: React.FC<AICommandPaletteProps> = ({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.02 }}
-                  className={`
-                    flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-colors
-                    ${index === selectedIndex 
-                      ? 'bg-void-800 border border-void-600' 
-                      : 'hover:bg-void-800/50'
-                    }
-                  `}
+                  className={`flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-colors ${index === selectedIndex ? 'bg-void-800 border border-void-600' : 'hover:bg-void-800/50'}`}
                   onClick={() => executeCommand(command)}
                 >
                   <div className={`p-2 rounded ${getCategoryColor(command.category)} bg-void-800`}>
                     <command.icon className="w-4 h-4" />
                   </div>
-                  
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-medium text-void-100 truncate">
-                        {command.title}
-                      </h3>
-                      {command.shortcut && (
-                        <kbd className="px-2 py-1 bg-void-700 text-void-300 text-xs rounded">
-                          {command.shortcut}
-                        </kbd>
-                      )}
+                      <h3 className="font-medium text-void-100 truncate">{command.title}</h3>
+                      {command.shortcut && <kbd className="px-2 py-1 bg-void-700 text-void-300 text-xs rounded">{command.shortcut}</kbd>}
                     </div>
-                    <p className="text-sm text-void-400 truncate">
-                      {command.description}
-                    </p>
+                    <p className="text-sm text-void-400 truncate">{command.description}</p>
                   </div>
                 </motion.div>
               ))}
             </div>
           )}
         </div>
-
-        {/* Footer */}
         <div className="p-3 border-t border-void-700 bg-void-850">
           <div className="flex items-center justify-between text-xs text-void-400">
             <div className="flex items-center space-x-4">

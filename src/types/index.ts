@@ -14,14 +14,7 @@ export interface FileItem {
   level?: number
 }
 
-export interface EditorTheme {
-  name: string
-  primary: string
-  secondary: string
-  accent: string
-  background: string
-  foreground: string
-}
+export type Theme = 'light' | 'dark'
 
 export interface FolderContextMenu {
   x: number
@@ -39,4 +32,10 @@ export interface CompilationResult {
   status: 'running' | 'success' | 'error' | 'info';
   output: string[];
   timestamp: string;
+}
+
+export interface ToastMessage {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
 }

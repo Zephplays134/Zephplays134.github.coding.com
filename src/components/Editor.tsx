@@ -13,7 +13,7 @@ import {
   EyeIcon,
   EyeOffIcon
 } from 'lucide-react'
-import { FileItem, EditorAction } from '../types'
+import { FileItem, EditorAction, Theme } from '../types'
 import { getLanguageFromFilename } from '../utils/fileUtils'
 
 interface EditorProps {
@@ -34,6 +34,8 @@ interface EditorProps {
   onCompile: () => void
   editorAction: EditorAction
   onEditorActionComplete: () => void
+  theme: Theme
+  onOpenSettings: () => void
 }
 
 const Editor: React.FC<EditorProps> = ({
@@ -53,7 +55,9 @@ const Editor: React.FC<EditorProps> = ({
   onTogglePreview,
   onCompile,
   editorAction,
-  onEditorActionComplete
+  onEditorActionComplete,
+  theme,
+  onOpenSettings
 }) => {
   const editorRef = useRef<any>(null)
   const monacoRef = useRef<any>(null)
@@ -85,6 +89,12 @@ const Editor: React.FC<EditorProps> = ({
     }
   }, [editorAction, onEditorActionComplete])
 
+  useEffect(() => {
+    if (monacoRef.current) {
+      monacoRef.current.editor.setTheme(theme === 'dark' ? 'void-dark' : 'void-light')
+    }
+  }, [theme])
+
   const handleEditorChange = (value: string | undefined) => {
     if (activeFile && value !== undefined) {
       onFileContentChange(activeFile.id, value)
@@ -96,151 +106,58 @@ const Editor: React.FC<EditorProps> = ({
     monacoRef.current = monaco
     
     monaco.editor.defineTheme('void-dark', {
-      base: 'vs-dark',
-      inherit: true,
-      rules: [
-        { token: 'comment', foreground: '64748b', fontStyle: 'italic' },
-        { token: 'keyword', foreground: '3b82f6' },
-        { token: 'string', foreground: '10b981' },
-        { token: 'number', foreground: 'f59e0b' },
-        { token: 'function', foreground: '8b5cf6' },
-        { token: 'variable', foreground: 'f8fafc' },
-        { token: 'type', foreground: '06b6d4' },
-        { token: 'class', foreground: 'f472b6' },
-        { token: 'interface', foreground: 'a78bfa' },
-        { token: 'namespace', foreground: 'fbbf24' },
-        { token: 'parameter', foreground: 'fcd34d' },
-        { token: 'property', foreground: '34d399' },
-        { token: 'enum', foreground: 'fb7185' },
-        { token: 'operator', foreground: '94a3b8' },
-      ],
-      colors: {
-        'editor.background': '#020617',
-        'editor.foreground': '#f8fafc',
-        'editor.lineHighlightBackground': '#1e293b',
-        'editor.selectionBackground': '#334155',
-        'editor.inactiveSelectionBackground': '#1e293b',
-        'editorCursor.foreground': '#3b82f6',
-        'editorWhitespace.foreground': '#475569',
-        'editorIndentGuide.background': '#334155',
-        'editorIndentGuide.activeBackground': '#475569',
-        'editorLineNumber.foreground': '#64748b',
-        'editorLineNumber.activeForeground': '#94a3b8',
-        'editor.selectionHighlightBackground': '#334155',
-        'editor.wordHighlightBackground': '#1e293b',
-        'editor.wordHighlightStrongBackground': '#334155',
-        'editor.findMatchBackground': '#fbbf24',
-        'editor.findMatchHighlightBackground': '#f59e0b',
-        'editor.hoverHighlightBackground': '#334155',
-        'editorSuggestWidget.background': '#1e293b',
-        'editorSuggestWidget.border': '#475569',
-        'editorSuggestWidget.foreground': '#f8fafc',
-        'editorSuggestWidget.selectedBackground': '#334155',
-        'editorWidget.background': '#1e293b',
-        'editorWidget.border': '#475569',
-        'input.background': '#0f172a',
-        'input.border': '#475569',
-        'input.foreground': '#f8fafc',
-        'inputOption.activeBorder': '#3b82f6',
-        'dropdown.background': '#1e293b',
-        'dropdown.border': '#475569',
-        'dropdown.foreground': '#f8fafc',
-        'list.activeSelectionBackground': '#334155',
-        'list.activeSelectionForeground': '#f8fafc',
-        'list.hoverBackground': '#1e293b',
-        'list.inactiveSelectionBackground': '#1e293b',
-        'list.inactiveSelectionForeground': '#f8fafc',
-        'menu.background': '#1e293b',
-        'menu.border': '#475569',
-        'menu.foreground': '#f8fafc',
-        'menu.selectionBackground': '#334155',
-        'menu.selectionForeground': '#f8fafc',
-        'menubar.selectionBackground': '#334155',
-        'menubar.selectionForeground': '#f8fafc',
-        'peekView.border': '#475569',
-        'peekViewEditor.background': '#0f172a',
-        'peekViewResult.background': '#1e293b',
-        'peekViewTitle.background': '#334155',
-        'scrollbar.shadow': '#020617',
-        'scrollbarSlider.background': '#475569',
-        'scrollbarSlider.hoverBackground': '#64748b',
-        'scrollbarSlider.activeBackground': '#94a3b8',
-      }
+      base: 'vs-dark', inherit: true,
+      rules: [],
+      colors: { 'editor.background': '#020617' }
+    })
+
+    monaco.editor.defineTheme('void-light', {
+      base: 'vs', inherit: true,
+      rules: [],
+      colors: { 'editor.background': '#ffffff' }
     })
     
-    monaco.editor.setTheme('void-dark')
+    monaco.editor.setTheme(theme === 'dark' ? 'void-dark' : 'void-light')
   }
 
   return (
-    <div className="flex flex-col h-full bg-void-950">
-      {/* Header */}
-      <div className="bg-void-900 border-b border-void-700 flex items-center justify-between px-4 py-2">
+    <div className="flex flex-col h-full bg-white dark:bg-void-950">
+      <div className="bg-void-100 dark:bg-void-900 border-b border-void-200 dark:border-void-700 flex items-center justify-between px-4 py-2">
         <div className="flex items-center space-x-4">
           {sidebarCollapsed && (
-            <button
-              onClick={onToggleSidebar}
-              className="p-1 hover:bg-void-800 rounded transition-colors"
-              title="Show Sidebar"
-            >
-              <MenuIcon className="w-4 h-4 text-void-400" />
+            <button onClick={onToggleSidebar} className="p-1 hover:bg-void-200 dark:hover:bg-void-800 rounded transition-colors" title="Show Sidebar">
+              <MenuIcon className="w-4 h-4 text-void-600 dark:text-void-400" />
             </button>
           )}
-          <h1 className="text-lg font-bold text-void-100">
-            <span className="text-blue-400">void</span>
-            {isAIActive && (
-              <span className="ml-2 text-xs bg-blue-600 text-white px-2 py-1 rounded">
-                AI
-              </span>
-            )}
+          <h1 className="text-lg font-bold text-void-800 dark:text-void-100">
+            <span className="text-blue-500">void</span>
+            {isAIActive && <span className="ml-2 text-xs bg-blue-600 text-white px-2 py-1 rounded">AI</span>}
           </h1>
         </div>
         
         <div className="flex items-center space-x-2">
-          <button
-            onClick={onCompile}
-            className="p-2 hover:bg-void-800 rounded transition-colors"
-            title="Compile & Run (Ctrl+B)"
-          >
-            <PlayIcon className="w-4 h-4 text-green-400" />
+          <button onClick={onCompile} className="p-2 hover:bg-void-200 dark:hover:bg-void-800 rounded transition-colors" title="Compile & Run (Ctrl+B)">
+            <PlayIcon className="w-4 h-4 text-green-500" />
           </button>
-          <button
-            onClick={onTogglePreview}
-            className="p-2 hover:bg-void-800 rounded transition-colors"
-            title={isPreviewOpen ? "Hide Preview" : "Show Preview"}
-          >
-            {isPreviewOpen ? <EyeOffIcon className="w-4 h-4 text-void-400" /> : <EyeIcon className="w-4 h-4 text-void-400" />}
+          <button onClick={onTogglePreview} className="p-2 hover:bg-void-200 dark:hover:bg-void-800 rounded transition-colors" title={isPreviewOpen ? "Hide Preview" : "Show Preview"}>
+            {isPreviewOpen ? <EyeOffIcon className="w-4 h-4 text-void-600 dark:text-void-400" /> : <EyeIcon className="w-4 h-4 text-void-600 dark:text-void-400" />}
           </button>
-          <button
-            onClick={onOpenCommandPalette}
-            className="p-2 hover:bg-void-800 rounded transition-colors"
-            title="Command Palette (Ctrl+K)"
-          >
-            <CommandIcon className="w-4 h-4 text-void-400" />
+          <button onClick={onOpenCommandPalette} className="p-2 hover:bg-void-200 dark:hover:bg-void-800 rounded transition-colors" title="Command Palette (Ctrl+K)">
+            <CommandIcon className="w-4 h-4 text-void-600 dark:text-void-400" />
           </button>
-          <button
-            onClick={onOpenAIAssistant}
-            className={`p-2 hover:bg-void-800 rounded transition-colors ${
-              isAIActive ? 'bg-blue-600 text-white' : ''
-            }`}
-            title="AI Assistant"
-          >
+          <button onClick={onOpenAIAssistant} className={`p-2 hover:bg-void-200 dark:hover:bg-void-800 rounded transition-colors ${isAIActive ? 'bg-blue-600 text-white' : ''}`} title="AI Assistant">
             <BotIcon className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => activeFile && onFileSave(activeFile.id)}
-            className="p-2 hover:bg-void-800 rounded transition-colors"
-            title="Save File (Ctrl+S)"
-          >
-            <SaveIcon className="w-4 h-4 text-void-400" />
+          <button onClick={() => activeFile && onFileSave(activeFile.id)} className="p-2 hover:bg-void-200 dark:hover:bg-void-800 rounded transition-colors" title="Save File (Ctrl+S)">
+            <SaveIcon className="w-4 h-4 text-void-600 dark:text-void-400" />
           </button>
-          <button className="p-2 hover:bg-void-800 rounded transition-colors">
-            <SettingsIcon className="w-4 h-4 text-void-400" />
+          <button onClick={onOpenSettings} className="p-2 hover:bg-void-200 dark:hover:bg-void-800 rounded transition-colors" title="Settings">
+            <SettingsIcon className="w-4 h-4 text-void-600 dark:text-void-400" />
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-void-900 border-b border-void-700 flex overflow-x-auto scrollbar-thin">
+      <div className="bg-void-100 dark:bg-void-900 border-b border-void-200 dark:border-void-700 flex overflow-x-auto scrollbar-thin">
         <AnimatePresence>
           {openFiles.map((file) => (
             <motion.div
@@ -248,28 +165,13 @@ const Editor: React.FC<EditorProps> = ({
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
-              className={`
-                flex items-center space-x-2 px-4 py-2 border-r border-void-700 cursor-pointer
-                min-w-0 flex-shrink-0 transition-colors
-                ${file.isActive 
-                  ? 'bg-void-800 text-void-50' 
-                  : 'text-void-300 hover:bg-void-800/50 hover:text-void-50'
-                }
-              `}
+              className={`flex items-center space-x-2 px-4 py-2 border-r border-void-200 dark:border-void-700 cursor-pointer min-w-0 flex-shrink-0 transition-colors ${file.isActive ? 'bg-white dark:bg-void-800 text-void-800 dark:text-void-50' : 'text-void-500 dark:text-void-300 hover:bg-void-200/50 dark:hover:bg-void-800/50 hover:text-void-800 dark:hover:text-void-50'}`}
               onClick={() => onFileSelect(file.id)}
             >
               <FileIcon className="w-4 h-4 flex-shrink-0" />
               <span className="text-sm truncate max-w-32">{file.name}</span>
-              {file.isModified && (
-                <div className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0" />
-              )}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onFileClose(file.id)
-                }}
-                className="p-1 hover:bg-void-700 rounded transition-colors flex-shrink-0"
-              >
+              {file.isModified && <div className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0" />}
+              <button onClick={(e) => { e.stopPropagation(); onFileClose(file.id); }} className="p-1 hover:bg-void-300 dark:hover:bg-void-700 rounded transition-colors flex-shrink-0">
                 <XIcon className="w-3 h-3" />
               </button>
             </motion.div>
@@ -277,7 +179,6 @@ const Editor: React.FC<EditorProps> = ({
         </AnimatePresence>
       </div>
 
-      {/* Editor */}
       <div className="flex-1 relative">
         {activeFile ? (
           <MonacoEditor
@@ -290,68 +191,19 @@ const Editor: React.FC<EditorProps> = ({
             onMount={handleEditorDidMount}
             options={{
               fontSize: 14,
-              fontFamily: 'JetBrains Mono, Fira Code, monospace',
-              lineHeight: 1.5,
               minimap: { enabled: true },
               scrollBeyondLastLine: false,
               wordWrap: 'on',
               automaticLayout: true,
-              tabSize: 2,
-              insertSpaces: true,
-              renderWhitespace: 'selection',
-              bracketPairColorization: { enabled: true },
-              guides: {
-                bracketPairs: true,
-                indentation: true,
-              },
-              smoothScrolling: true,
-              cursorSmoothCaretAnimation: 'on',
-              renderLineHighlight: 'gutter',
-              selectionHighlight: false,
-              occurrencesHighlight: false,
-              theme: 'void-dark',
-              mouseWheelZoom: true,
-              contextmenu: true,
-              quickSuggestions: true,
-              parameterHints: {
-                enabled: true,
-              },
-              suggestOnTriggerCharacters: true,
-              acceptSuggestionOnEnter: 'on',
-              acceptSuggestionOnCommitCharacter: true,
-              snippetSuggestions: 'top',
-              wordBasedSuggestions: true,
-              formatOnType: true,
-              formatOnPaste: true,
-              autoClosingBrackets: 'always',
-              autoClosingQuotes: 'always',
-              autoSurround: 'languageDefined',
-              folding: true,
-              showFoldingControls: 'always',
-              foldingHighlight: true,
-              foldingImportsByDefault: false,
-              unfoldOnClickAfterEndOfLine: false,
-              renderControlCharacters: false,
-              renderIndentGuides: true,
-              highlightActiveIndentGuide: true,
-              rulers: [],
-              colorDecorators: true,
-              codeLens: true,
-              lightbulb: {
-                enabled: true,
-              },
-              codeActionsOnSave: {
-                'source.fixAll': true,
-              },
             }}
           />
         ) : (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <FileIcon className="w-16 h-16 text-void-600 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-void-300 mb-2">No file open</h3>
-              <p className="text-void-500">Select a file from the sidebar to start editing</p>
-              <p className="text-void-600 text-sm mt-2">Press Ctrl+K to open AI Command Palette</p>
+              <FileIcon className="w-16 h-16 text-void-300 dark:text-void-600 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-void-700 dark:text-void-300 mb-2">No file open</h3>
+              <p className="text-void-500 dark:text-void-500">Select a file from the sidebar to start editing</p>
+              <p className="text-void-400 dark:text-void-600 text-sm mt-2">Press Ctrl+K for commands</p>
             </div>
           </div>
         )}

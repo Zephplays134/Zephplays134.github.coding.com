@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { FileItem, CompilationResult } from '../types'
 
 interface AIFeatureState {
@@ -17,6 +17,17 @@ export const useAIFeatures = () => {
     isAIConnected: true, // Mock connection status
     compilationResult: null
   })
+
+  const compileTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Add a cleanup effect to clear the timer when the component unmounts
+  useEffect(() => {
+    return () => {
+      if (compileTimerRef.current) {
+        clearTimeout(compileTimerRef.current)
+      }
+    }
+  }, [])
 
   const toggleAIAssistant = useCallback(() => {
     setState(prev => ({
@@ -55,16 +66,23 @@ export const useAIFeatures = () => {
   }, [])
 
   const compileCode = useCallback((file: FileItem) => {
+    const initialOutputLine = `[${new Date().toLocaleTimeString()}] Starting compilation for ${file.name}...`
+    
     setState(prev => ({
       ...prev,
       compilationResult: {
         status: 'running',
-        output: [`[${new Date().toLocaleTimeString()}] Starting compilation for ${file.name}...`],
+        output: [initialOutputLine],
         timestamp: new Date().toISOString()
       }
     }))
 
-    setTimeout(() => {
+    // Clear any pending compilation timer to prevent race conditions
+    if (compileTimerRef.current) {
+      clearTimeout(compileTimerRef.current)
+    }
+
+    compileTimerRef.current = setTimeout(() => {
       let result: Omit<CompilationResult, 'timestamp'>;
       const lang = file.language;
       const content = file.content;
@@ -149,14 +167,15 @@ export const useAIFeatures = () => {
         compilationResult: {
           ...result,
           output: [
-            ...(prev.compilationResult?.output || []),
+            initialOutputLine,
             ...result.output,
             `[${new Date().toLocaleTimeString()}] Process finished.`
           ],
           timestamp: new Date().toISOString()
         }
       }))
-
+      
+      compileTimerRef.current = null;
     }, 1500);
   }, [])
 

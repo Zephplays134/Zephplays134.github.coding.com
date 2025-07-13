@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, ReactNode, useEffect } from 'react'
 
 interface ResizablePanelProps {
-  children: ReactNode[]
+  children: ReactNode
 }
 
 const ResizablePanel: React.FC<ResizablePanelProps> = ({ children }) => {
@@ -47,7 +47,9 @@ const ResizablePanel: React.FC<ResizablePanelProps> = ({ children }) => {
     }
   }, [handleMouseMove, handleMouseUp])
   
-  const [leftPanel, rightPanel] = React.Children.toArray(children)
+  const panels = React.Children.toArray(children)
+  const leftPanel = panels[0]
+  const rightPanel = panels.length > 1 ? panels[1] : null
 
   return (
     <div
@@ -55,24 +57,28 @@ const ResizablePanel: React.FC<ResizablePanelProps> = ({ children }) => {
       className="flex flex-1 overflow-hidden"
     >
       <div
-        style={{ width: `${panelWidth}%` }}
+        style={{ width: rightPanel ? `${panelWidth}%` : '100%' }}
         className="h-full min-w-[200px]"
       >
         {leftPanel}
       </div>
 
-      <div
-        onMouseDown={handleMouseDown}
-        className="w-2 h-full cursor-col-resize bg-void-800 hover:bg-blue-600 active:bg-blue-500 transition-colors duration-200 flex-shrink-0"
-        title="Drag to resize"
-      />
+      {rightPanel && (
+        <>
+          <div
+            onMouseDown={handleMouseDown}
+            className="w-2 h-full cursor-col-resize bg-void-800 hover:bg-blue-600 active:bg-blue-500 transition-colors duration-200 flex-shrink-0"
+            title="Drag to resize"
+          />
 
-      <div 
-        style={{ width: `${100 - panelWidth}%` }}
-        className="h-full min-w-[200px]"
-      >
-        {rightPanel}
-      </div>
+          <div 
+            style={{ width: `${100 - panelWidth}%` }}
+            className="h-full min-w-[200px]"
+          >
+            {rightPanel}
+          </div>
+        </>
+      )}
     </div>
   )
 }
